@@ -17,6 +17,10 @@ NavigationPane {
         statusToast.cancel()
     }
 
+    function coverForStation(stationId) {
+        return "asset:///images/stations/" + stationId + ".jpg"
+    }
+
     Menu.definition: MenuDefinition {
         settingsAction: SettingsActionItem {
             title: qsTr("Settings")
@@ -77,12 +81,16 @@ NavigationPane {
                     clearSelection()
                     select(indexPath)
                     // Play Station ----
-                    player.setSourceUrl("http://prem1.di.fm:80/" + dataModel.data(indexPath).id + "?" + listen_key);
+                    var stationId = dataModel.data(indexPath).id
+                    player.setSourceUrl("http://prem1.di.fm:80/" + stationId + "?" + listen_key)
                     showToast("Loading " + player.sourceUrl)
                     var playingError = player.play();
                     if ( playingError != MediaError.None ) {
                         showToast("Error playing stream (Error " + playingError + ") \n please check your Listen Key in the Settings")
                     }
+
+                    nowPlaying.acquire()
+                    nowPlaying.setIconUrl(coverForStation(stationId)); //"asset:///images/stations/" + stationId + ".jpg")
                 }
                 accessibility.name: "Station List"
             }
@@ -142,10 +150,15 @@ NavigationPane {
             }
 
             onMediaStateChanged: {
+                nowPlaying.mediaState = mediaState
                 if (mediaState == MediaState.Stopped) {
+                    stationList.clearSelection()
+
+                    // clear player bar
                     stopButton.enabled = false;
-                    trackTitle.text = "";
-                    trackDuration.text = "";
+                    trackTitle.text = "Select a station to play";
+
+                    nowPlaying.revoke()
                 } else if (mediaState == MediaState.Started) {
                     stopButton.enabled = true;
                 }
@@ -164,11 +177,40 @@ NavigationPane {
             }
             onMetaDataChanged: {
                 trackTitle.text = metaData.title
+                nowPlaying.setMetaData(metaData)
             }
 //            onDurationChanged: {
 //                trackDuration.text = "[ " + duration + " s]";
 //            }
         },
+        NowPlayingConnection {
+            id: nowPlaying
+
+            duration: player.duration
+            position: player.position
+//            iconUrl: "asset:///images/music.png"
+            mediaState: player.mediaState
+            overlayStyle: OverlayStyle.Fancy
+
+            previousEnabled: false
+            nextEnabled: false
+
+            onAcquired: {
+            }
+
+            onPause: {
+                player.pause()
+            }
+
+            onPlay: {
+                player.play()
+            }
+
+            onRevoked: {
+                player.stop()
+            }
+        },
+
         ComponentDefinition {
             id: settingsPageDefinition
             source: "Settings.qml"
