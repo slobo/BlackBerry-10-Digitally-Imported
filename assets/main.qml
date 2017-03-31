@@ -163,13 +163,6 @@ NavigationPane {
                 }
             }
             onMetaDataChanged: {
-//                var text = ""
-//                for (var prop in metaData) {   
-//                  text += prop + "=" + metaData[prop] + "\n"
-//                }
-//                statusToast.body = text
-////                statusToast.body = metaData.title
-//                statusToast.show();
                 trackTitle.text = metaData.title
             }
 //            onDurationChanged: {
