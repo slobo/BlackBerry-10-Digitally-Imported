@@ -4,13 +4,23 @@ import bb.system 1.2
 
 NavigationPane {
     id: navigationPane
-    
+
+    function openSettings() {
+        navigationPane.push(settingsPageDefinition.createObject());
+    }
+
+    function showToast(message) {
+        statusToast.body = message
+        statusToast.show()
+    }
+    function hideToast() {
+        statusToast.cancel()
+    }
+
     Menu.definition: MenuDefinition {
         settingsAction: SettingsActionItem {
             title: qsTr("Settings")
-            onTriggered: {
-                navigationPane.push(settingsPageDefinition.createObject());
-            }
+            onTriggered: openSettings()
         }
         helpAction: HelpActionItem {
             title: qsTr("Info")
@@ -18,7 +28,7 @@ NavigationPane {
             attachedObjects: [
                 SystemToast {
                     id: aboutToast
-                    body: "Digitally Imported for BB10 \n Author: Slobodan Mišković"
+                    body: "Digitally Imported for BB10 \n 2017 Mišković Informatics Inc."
                 }
             ]
             onTriggered: {
@@ -26,7 +36,7 @@ NavigationPane {
             }
         }
     }
-    
+
     Page {
         id: mainPage
         Container {            
@@ -36,13 +46,13 @@ NavigationPane {
                 dataModel: XmlDataModel {
                     source: "stations.xml"
                 }
-                
+
                 // Use a ListItemComponent to determine which property in the
                 // data model is displayed for each list item
                 listItemComponents: [
                     ListItemComponent {
                         type: "station"
-                        
+
                         // Use a predefined StandardListItem
                         // to represent "listItem" items
                         StandardListItem {
@@ -54,17 +64,29 @@ NavigationPane {
                         }
                     }
                 ]
-                
+
                 onTriggered: {
+                    // Check Listening Key
+                    var listen_key = settings.value("listen_key", "");
+                    if ( ! listen_key ) {
+                       openSettings()
+                       showToast("DI Premium Listening Key is required to play the channels")
+                       return
+                    }
+                    // Update List Appearance ----
                     clearSelection()
                     select(indexPath)
-                    // Play Station
-                    player.setSourceUrl("http://prem1.di.fm:80/" + dataModel.data(indexPath).id + "?" + settings.value("listen_key"));
-                    player.play();
+                    // Play Station ----
+                    player.setSourceUrl("http://prem1.di.fm:80/" + dataModel.data(indexPath).id + "?" + listen_key);
+                    showToast("Loading " + player.sourceUrl)
+                    var playingError = player.play();
+                    if ( playingError != MediaError.None ) {
+                        showToast("Error playing stream (Error " + playingError + ") \n please check your Listen Key in the Settings")
+                    }
                 }
                 accessibility.name: "Station List"
             }
-            
+
             Container {
                 layout: StackLayout {
                     orientation: LayoutOrientation.LeftToRight
@@ -79,9 +101,9 @@ NavigationPane {
                 ActivityIndicator {
                     id: loadingIndicator
                     accessibility.name: "Loading Status"
-                    
+
                 }
-                
+
                 Button {
                     id: stopButton
                     text: qsTr("Stop")
@@ -103,23 +125,23 @@ NavigationPane {
                 }
 
             }
-                  
+
         } // end of top-level Container
-        
+
     }// end of Page
-    
+
     attachedObjects: [
         SystemToast {
             id: statusToast
         },
         MediaPlayer {
             id: player
+
             onError: {
-               statusToast.body = "Error Playing " + mediaError
-               statusToast.show();
+                showToast("Error Playing " + mediaError)
             }
+
             onMediaStateChanged: {
-                console.log("mediaStateChanged:", mediaState)
                 if (mediaState == MediaState.Stopped) {
                     stopButton.enabled = false;
                     trackTitle.text = "";
@@ -130,15 +152,14 @@ NavigationPane {
             }
             onBufferStatusChanged: {
                 if (bufferStatus === BufferStatus.Buffering) {
-                    statusToast.body = "Loading " + player.sourceUrl
-                    statusToast.show()
+                    showToast("Loading " + player.sourceUrl)
                 } 
 //                else if (bufferStatus === BufferStatus.Playing ){
 //                    statusToast.body = "Playing " + player.sourceUrl;
 //                    statusToast.show();
 //                } 
                 else {
-                    statusToast.cancel()
+                    hideToast()
                 }
             }
             onMetaDataChanged: {
